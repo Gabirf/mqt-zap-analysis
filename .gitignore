@@ -218,3 +218,21 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- C++ & CMake Artifacts ---
+*.so
+*.dylib
+*.dll
+*.a
+*.o
+CMakeCache.txt
+CMakeFiles/
+cmake-build-*/
+_deps/
+
+# --- Experiment Outputs ---
+output/
+batches/
+*.naviz
+*.log
+.DS_Store
