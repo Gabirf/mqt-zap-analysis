@@ -320,7 +320,7 @@ def main():
 
     #utils.batch_transpiler(benchmarks)
     benchmark_list = utils.batch_translator(benchmarks, "square_architecture.json")
-    run_batch(benchmark_list, 3)
+    run_batch(benchmark_list, 2, "test new base code design")
 
 if __name__ == "__main__":
     main()

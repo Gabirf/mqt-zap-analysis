@@ -18,7 +18,7 @@ if [ -f "requirements.txt" ]; then
     uv pip install -r requirements.txt
 else
     echo "--> Initial run: Installing base quantum stack and build tools..."
-    uv pip install qiskit networkx matplotlib mqt.bench setuptools-scm scikit-build-core nanobind cmake ninja
+    uv pip install qiskit networkx matplotlib mqt.bench setuptools-scm scikit-build-core nanobind cmake ninja psutil
 fi
 
 echo "--> Installing quantum dependencies..."
