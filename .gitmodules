@@ -1,0 +1,6 @@
+[submodule "QMAP"]
+	path = QMAP
+	url = https://github.com/Gabirf/QMAP.git
+[submodule "ZAP"]
+	path = ZAP
+	url = https://github.com/Gabirf/ZAP.git
