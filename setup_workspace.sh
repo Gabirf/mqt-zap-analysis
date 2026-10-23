@@ -31,6 +31,10 @@ if [ -d "QMAP" ]; then
 else
     echo "--> Warning: QMAP directory not found! Installing pre-built wheel..."
     uv pip install mqt.qmap
+    SITE_PACKAGES=$(.venv/bin/python -c "import site; print(site.getsitepackages()[0])")
+    if [ -d "$SITE_PACKAGES/mqt/qmap" ]; then
+        cp -f QMAP/python/mqt/qmap/*.py "$SITE_PACKAGES/mqt/qmap/" 2>/dev/null || true
+    fi
 fi
 
 if [ -f "ZAP/requirements.txt" ]; then
@@ -46,8 +50,8 @@ python -c "
 import qiskit
 import networkx
 try:
-    import mqt.qmap as qmap
-    print('  [OK] QMAP loaded from:', qmap.__file__)
+    from mqt.qmap.na.zoned import ZonedNeutralAtomArchitecture
+    print('  [OK] QMAP and ZonedNeutralAtomArchitecture loaded successfully!')
 except Exception as e:
     print('  [FAIL] QMAP import failed:', e)
 "

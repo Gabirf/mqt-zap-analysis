@@ -2,19 +2,25 @@ import json
 from collections import defaultdict
 import re
 import math
+import networkx as nx
 
 #local files
 from config import *
 import utils
 from ZAP.zap.zap import Zap
 
-from mqt.qmap.na.zoned import ZonedNeutralAtomArchitecture, RoutingAwareCompiler
+from mqt.qmap.na.zoned import ZonedNeutralAtomArchitecture, RoutingAwareCompiler, InitialPlacementStrategy
 from mqt.core import load
 
 #QMAP benchmark
-def run_qmap(arch_path: Path, circuit_path: Path) -> (str, ZonedNeutralAtomArchitecture):
+def run_qmap(arch_path: Path, circuit_path: Path,
+             initial_placement: InitialPlacementStrategy = InitialPlacementStrategy.Default) \
+                -> (str, ZonedNeutralAtomArchitecture):
     arch = ZonedNeutralAtomArchitecture.from_json_file(str(arch_path))
-    compiler = RoutingAwareCompiler(arch, warn_unsupported_gates=True)
+    compiler = RoutingAwareCompiler(
+        arch,
+        initial_placement_strategy=initial_placement,
+        warn_unsupported_gates=True)
 
     circ = load(circuit_path)
     code = compiler.compile(circ)
@@ -87,7 +93,7 @@ def json_to_naviz_converter(input_path: Path, output_path: Path) -> None:
                     gate_id = gate_id_lookup[gate_idx][count]
                     gate = gate_lookup[str(gate_id)]["name"]
                     angle = gate_lookup[str(gate_id)]["params"][0]
-                    lines.append(f"@+ {gate} {angle} atom{q_idx}\n")
+                    lines.append(f"@+ {gate} {angle:.5f} atom{q_idx}\n")
             case "2qGate":
                 lines.append(f"@+ cz zone_cz0\n")
             case "Crosstalk":
@@ -287,12 +293,18 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
 
         BENCH_DIR.mkdir(exist_ok=True)
 
-        print("---running QMAP---")
+        print("---running QMAP (IPS: Default) ---")
         code, arch = run_qmap(arch_path, circuit_path)
         arch.to_namachine_file(str(BENCH_DIR / "architecture.namachine"))
         with open(BENCH_DIR / "QMAP.naviz", "w") as f:
             f.write(str(code))
         utils.sanitize_naviz_file(BENCH_DIR / "QMAP.naviz")
+
+        print("---running QMAP (IPS: ZAP) ---")
+        code, arch = run_qmap(arch_path, circuit_path, InitialPlacementStrategy.ZAP)
+        with open(BENCH_DIR / "QMAP_InitMap.naviz", "w") as f:
+            f.write(str(code))
+        utils.sanitize_naviz_file(BENCH_DIR / "QMAP_InitMap.naviz")
 
         print("---running ZAP---")
         run_ZAP(arch_path, circuit_path, BENCH_DIR / "ZAP")
@@ -303,8 +315,9 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
 
         print("Initiating simulations...")
         QMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP.naviz", BENCH_DIR)
+        QMAP_INITMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP_InitMap.naviz", BENCH_DIR)
         ZAP_RESULTS = simulation(arch_path, BENCH_DIR / "ZAP.naviz", BENCH_DIR)
-        utils.ap_markdown(BATCH_DIR, bench_id, benchmark, QMAP_RESULTS, ZAP_RESULTS)
+        utils.ap_markdown(BATCH_DIR, bench_id, benchmark, QMAP_RESULTS, QMAP_INITMAP_RESULTS , ZAP_RESULTS)
 
         bench_id += 1
 
@@ -313,14 +326,14 @@ def main():
         "qft": ("qft", [10, 20, 50, 100]),
         "graph": ("graphstate", [60, 100]),
         "arith": ("multiplier", [16, 20]),
-        "qaoa": ("qaoa", [10, 20, 50, 100]),
+        "qaoa": ("qaoa", [10, 20, 50, 100, 250]),
     }
 
-    tmp = {"qft": ("qft", [10, 20]),}
+    tmp = {"qft": ("qft", [10, 20])}
 
     #utils.batch_transpiler(benchmarks)
     benchmark_list = utils.batch_translator(benchmarks, "square_architecture.json")
-    run_batch(benchmark_list, 2, "test new base code design")
+    run_batch(benchmark_list, 6, "test new mapping funcitons, greater scale")
 
 if __name__ == "__main__":
     main()

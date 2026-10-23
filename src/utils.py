@@ -74,7 +74,7 @@ def init_markdown(dir_path: Path, batch_id: int, benchmarks: list[tuple[str, str
 
 #Appends information about each benchmark and its results.
 def ap_markdown(dir_path: Path, bench_id: int, benchmark: tuple[str, str, Path], QMAP_RESULTS: float | int,
-                ZAP_RESULTS: float | int):
+                QMAP_INITMAP_RESULTS: float | int, ZAP_RESULTS: float | int):
     file_path = dir_path / "BENCHMARK_SPEC.md"
     arch_name, circuit_name, _ = benchmark
 
@@ -85,7 +85,8 @@ def ap_markdown(dir_path: Path, bench_id: int, benchmark: tuple[str, str, Path],
 - Benchmark name: {circuit_name}
 
 **Benchmark Results:**
-- QMAP Results: {QMAP_RESULTS}
+- QMAP (IPS: Default) Results: {QMAP_RESULTS}
+- QMAP (IPS: ZAP) Results: {QMAP_INITMAP_RESULTS}
 - ZAP Results: {ZAP_RESULTS}
 - QMAP / ZAP: {QMAP_RESULTS / ZAP_RESULTS}
 """
