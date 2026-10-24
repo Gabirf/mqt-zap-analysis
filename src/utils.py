@@ -2,6 +2,8 @@ from pathlib import Path
 import platform
 import psutil
 from datetime import datetime
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import re
 
 from qiskit import QuantumCircuit, qasm2, transpile
@@ -157,3 +159,39 @@ def batch_translator(input: dict[str, tuple[str, list[int]]], arch_name: str) ->
             output.append((arch_name, circuit_label, (CIRCUIT_INPUT / directory / circuit_label)))
 
     return output
+
+def plotter(csv, output_path: Path):
+    # Use the PGF backend
+    mpl.use("pgf")
+    mpl.rcParams.update(
+        {
+            "pgf.texsystem": "pdflatex",
+            "font.family": "serif",
+            "text.usetex": True,
+            "pgf.rcfonts": False,
+        }
+    )
+
+    for benchmark, rest in csv.groupby("benchmarks"):
+        fig, ax = plt.subplots(figsize=(5.5, 3.5))
+
+        for compiler, group in rest.groupby("compiler"):
+            ax.plot(
+                group["qubits"],
+                group["fidelity"],
+                marker="o",
+                label=f"{benchmark} ({compiler})",
+            )
+
+        if benchmark == "qft" or benchmark == "multiplier" or benchmark == "qaoa":
+            ax.set_yscale("log")
+
+        ax.set_xlabel(r"Qubits ($x$)")
+        ax.set_ylabel(r"Fidelity ($y$)")
+        ax.grid(True, linestyle="--", alpha=0.5)
+        ax.legend()
+
+        filename = f"plot_{benchmark}.pgf".replace(" ", "_")
+        fig.savefig(output_path / filename, bbox_inches="tight")
+
+        plt.close(fig)

@@ -3,6 +3,7 @@ from collections import defaultdict
 import re
 import math
 import networkx as nx
+import pandas as pd
 
 #local files
 from config import *
@@ -154,7 +155,7 @@ def cz_pairs(ids: set, locs: dict):
 
     return pairs, singles
 
-def simulation(arch_path: Path, input_path: Path, output_path: Path) -> float | int:
+def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -> float | int:
 
     qubit_count = 0
     gate1_count = 0
@@ -272,7 +273,14 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path) -> float | 
             tmp *= math.exp(- time / 1500000) # 1.5s straight out of ZAP paper T2
         print(f"f1: {FIDEL_Q1}, g1c: {gate1_count}, f2: {FIDEL_Q2}, g2c: {gate2_count}, ftr: {FIDEL_TRAN},"
               f" fta: {FIDEL_TALK}, tac: {talk_count} , trc: {tran_count}, tmp: {tmp}")
-        return FIDEL_Q1**gate1_count * FIDEL_Q2**gate2_count * FIDEL_TALK**talk_count * FIDEL_TRAN**tran_count * tmp
+
+        fidel = FIDEL_Q1**gate1_count * FIDEL_Q2**gate2_count * FIDEL_TALK**talk_count * FIDEL_TRAN**tran_count * tmp
+        csv_data["fidelity"].append(fidel)
+        csv_data["1QGC"].append(gate1_count)
+        csv_data["2QGC"].append(gate2_count)
+        csv_data["transitions"].append(tran_count)
+
+        return fidel
 
 #Batch functions
 def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: str = "N/A"):
@@ -280,6 +288,7 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
     #Create Batch directory
     BATCH_DIR = WORKSPACE_ROOT / "batches" / f"batch_{batch_id}"
     bench_id = 0
+    csv_data: dict[str, list[float | int | str]] = defaultdict(list)
 
     utils.init_markdown(BATCH_DIR, batch_id, benchmarks, purpose)
 
@@ -288,7 +297,6 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
         arch_path = ARCH_INPUT / arch_name
         print(f"running benchmark: {circuit_name}")
 
-        #Make Benchmark directory with compiler subdirectories
         BENCH_DIR = BATCH_DIR / f"benchmark_{bench_id}"
 
         BENCH_DIR.mkdir(exist_ok=True)
@@ -308,32 +316,54 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
 
         print("---running ZAP---")
         run_ZAP(arch_path, circuit_path, BENCH_DIR / "ZAP")
-        #removes the .qasm and adds _code.json to get the code file name:
         json_filename = Path(circuit_name).with_stem(Path(circuit_name).stem + "_code").with_suffix(".json")
         INPUT_TMP = BENCH_DIR / "ZAP" / "code" / json_filename
         json_to_naviz_converter(INPUT_TMP, BENCH_DIR / "ZAP.naviz")
 
         print("Initiating simulations...")
-        QMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP.naviz", BENCH_DIR)
-        QMAP_INITMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP_InitMap.naviz", BENCH_DIR)
-        ZAP_RESULTS = simulation(arch_path, BENCH_DIR / "ZAP.naviz", BENCH_DIR)
+
+        tokens = re.split(r"[_.]", circuit_name)
+
+        print(tokens)
+
+        bench = tokens[0]
+        qubits = tokens[1].replace("n", "")
+
+        for i in range(3):
+            csv_data["benchmarks"].append(bench)
+            csv_data["qubits"].append(qubits)
+
+        csv_data["compiler"].append("QMAP")
+        QMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP.naviz", BENCH_DIR, csv_data)
+        csv_data["compiler"].append("QMAP ZAPMAP")
+        QMAP_INITMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP_InitMap.naviz", BENCH_DIR, csv_data)
+        csv_data["compiler"].append("ZAP")
+        ZAP_RESULTS = simulation(arch_path, BENCH_DIR / "ZAP.naviz", BENCH_DIR, csv_data)
         utils.ap_markdown(BATCH_DIR, bench_id, benchmark, QMAP_RESULTS, QMAP_INITMAP_RESULTS , ZAP_RESULTS)
+
+        df = pd.DataFrame(csv_data)
+        df.to_csv(BATCH_DIR / "data.csv", index=False)
+        Path(BATCH_DIR / "plots").mkdir(parents=True, exist_ok=True)
+        utils.plotter(df, BATCH_DIR / "plots")
 
         bench_id += 1
 
 def main():
     benchmarks = {
-        "qft": ("qft", [10, 20, 50, 100]),
-        "graph": ("graphstate", [60, 100]),
-        "arith": ("multiplier", [16, 20]),
-        "qaoa": ("qaoa", [10, 20, 50, 100, 250]),
+        "qaoa": ("qaoa", [10, 20, 30, 40, 50]),
+    }
+
+    benchmarks2 = {
+        "qft": ("qft", [10, 20, 30, 40, 50]),
+        "graph": ("graphstate", [60, 70, 80, 90, 100]),
     }
 
     tmp = {"qft": ("qft", [10, 20])}
 
     #utils.batch_transpiler(benchmarks)
     benchmark_list = utils.batch_translator(benchmarks, "square_architecture.json")
-    run_batch(benchmark_list, 6, "test new mapping funcitons, greater scale")
+    run_batch(benchmark_list, 9, "testing csv")
+
 
 if __name__ == "__main__":
     main()

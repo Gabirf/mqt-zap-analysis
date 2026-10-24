@@ -18,7 +18,7 @@ if [ -f "requirements.txt" ]; then
     uv pip install -r requirements.txt
 else
     echo "--> Initial run: Installing base quantum stack and build tools..."
-    uv pip install qiskit networkx matplotlib mqt.bench setuptools-scm scikit-build-core nanobind cmake ninja psutil
+    uv pip install qiskit networkx matplotlib mqt.bench setuptools-scm scikit-build-core nanobind cmake ninja psutil pandas
 fi
 
 echo "--> Installing quantum dependencies..."
@@ -28,13 +28,13 @@ if [ -d "QMAP" ]; then
     echo "--> Compiling and installing editable QMAP from ./QMAP..."
     # Let uv isolate build requirements (resolves scikit-build-core and vcs_versioning automatically)
     uv pip install -e QMAP
-else
-    echo "--> Warning: QMAP directory not found! Installing pre-built wheel..."
-    uv pip install mqt.qmap
     SITE_PACKAGES=$(.venv/bin/python -c "import site; print(site.getsitepackages()[0])")
     if [ -d "$SITE_PACKAGES/mqt/qmap" ]; then
         cp -f QMAP/python/mqt/qmap/*.py "$SITE_PACKAGES/mqt/qmap/" 2>/dev/null || true
     fi
+else
+    echo "--> Warning: QMAP directory not found! Installing pre-built wheel..."
+    uv pip install mqt.qmap
 fi
 
 if [ -f "ZAP/requirements.txt" ]; then
@@ -49,6 +49,7 @@ echo "--> Verifying installation..."
 python -c "
 import qiskit
 import networkx
+import pandas
 try:
     from mqt.qmap.na.zoned import ZonedNeutralAtomArchitecture
     print('  [OK] QMAP and ZonedNeutralAtomArchitecture loaded successfully!')
