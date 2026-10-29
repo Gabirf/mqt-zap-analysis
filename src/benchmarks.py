@@ -2,7 +2,6 @@ import json
 from collections import defaultdict
 import re
 import math
-import networkx as nx
 import pandas as pd
 
 #local files
@@ -314,11 +313,11 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
             f.write(str(code))
         utils.sanitize_naviz_file(BENCH_DIR / "QMAP_InitMap.naviz")
 
-        print("---running ZAP---")
+        """print("---running ZAP---")
         run_ZAP(arch_path, circuit_path, BENCH_DIR / "ZAP")
         json_filename = Path(circuit_name).with_stem(Path(circuit_name).stem + "_code").with_suffix(".json")
         INPUT_TMP = BENCH_DIR / "ZAP" / "code" / json_filename
-        json_to_naviz_converter(INPUT_TMP, BENCH_DIR / "ZAP.naviz")
+        json_to_naviz_converter(INPUT_TMP, BENCH_DIR / "ZAP.naviz")"""
 
         print("Initiating simulations...")
 
@@ -329,7 +328,7 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
         bench = tokens[0]
         qubits = tokens[1].replace("n", "")
 
-        for i in range(3):
+        for i in range(2):
             csv_data["benchmarks"].append(bench)
             csv_data["qubits"].append(qubits)
 
@@ -337,9 +336,9 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
         QMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP.naviz", BENCH_DIR, csv_data)
         csv_data["compiler"].append("QMAP ZAPMAP")
         QMAP_INITMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP_InitMap.naviz", BENCH_DIR, csv_data)
-        csv_data["compiler"].append("ZAP")
-        ZAP_RESULTS = simulation(arch_path, BENCH_DIR / "ZAP.naviz", BENCH_DIR, csv_data)
-        utils.ap_markdown(BATCH_DIR, bench_id, benchmark, QMAP_RESULTS, QMAP_INITMAP_RESULTS , ZAP_RESULTS)
+        #csv_data["compiler"].append("ZAP")
+        #ZAP_RESULTS = simulation(arch_path, BENCH_DIR / "ZAP.naviz", BENCH_DIR, csv_data)
+        utils.ap_markdown(BATCH_DIR, bench_id, benchmark, QMAP_RESULTS, QMAP_INITMAP_RESULTS , 1)
 
         df = pd.DataFrame(csv_data)
         df.to_csv(BATCH_DIR / "data.csv", index=False)
@@ -349,21 +348,32 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
         bench_id += 1
 
 def main():
-    benchmarks = {
-        "qaoa": ("qaoa", [10, 20, 30, 40, 50]),
-    }
 
     benchmarks2 = {
         "qft": ("qft", [10, 20, 30, 40, 50]),
         "graph": ("graphstate", [60, 70, 80, 90, 100]),
     }
 
-    tmp = {"qft": ("qft", [10, 20])}
+    list = [10, 20, 30, 40, 50, 60]
+    tmp = {"3regular": ("3regular", list)}
+    tmp2 = {"graph": ("graphstate", [100, 200, 400, 800])}
 
-    #utils.batch_transpiler(benchmarks)
+    benchmarks = {
+        "qaoa": ("qaoa", [10, 20, 30, 40, 50]),
+        "qft": ("qft", [10, 20, 30, 40, 50, 60]),
+        "arith": ("multiplier", [8, 16, 32]),
+        "ghz": ("ghz", [10, 20, 30, 40, 50, 60, 70, 80]),
+        "graph": ("graphstate", [60, 70, 80, 90, 100]),
+    }
+
+    for i in list:
+        qc = utils.generate_3regular_circuit(i)
+        circuit_label = f"3regular_n{i}"
+        utils.transpilation(qc, CIRCUIT_INPUT / "3regular", circuit_label)
+
+    #utils.batch_transpiler(tmp2)
     benchmark_list = utils.batch_translator(benchmarks, "square_architecture.json")
-    run_batch(benchmark_list, 9, "testing csv")
-
+    run_batch(benchmark_list, 14, "Test list reduction (storage zone)")
 
 if __name__ == "__main__":
     main()

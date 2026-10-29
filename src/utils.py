@@ -5,6 +5,7 @@ from datetime import datetime
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import re
+import networkx as nx
 
 from qiskit import QuantumCircuit, qasm2, transpile
 from qiskit.circuit.library import SXGate
@@ -140,6 +141,8 @@ def transpilation(qc: str | QuantumCircuit, output_path: Path, qc_name: str = ""
     if type(qc) == str:
         qc_name = qc
 
+
+    output_path.mkdir(parents=True, exist_ok=True)
     qasm2.dump(transpiled_circuit, output_path / f"{qc_name}.qasm")
 
 def batch_transpiler(benchmarks: dict[str, tuple[str, list[int]]]) -> None:
@@ -195,3 +198,16 @@ def plotter(csv, output_path: Path):
         fig.savefig(output_path / filename, bbox_inches="tight")
 
         plt.close(fig)
+
+def generate_3regular_circuit(num_qubits: int, seed: int = 42) -> QuantumCircuit:
+    assert num_qubits % 2 == 0, "Number of qubits must be even for a 3-regular graph."
+
+    # 1. Generate an undirected 3-regular graph
+    G = nx.random_regular_graph(d=3, n=num_qubits, seed=seed)
+
+    # 2. Instantiate CZ gates along each edge
+    qc = QuantumCircuit(num_qubits)
+    for u, v in G.edges():
+        qc.cz(u, v)
+
+    return qc
