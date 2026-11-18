@@ -76,8 +76,7 @@ def init_markdown(dir_path: Path, batch_id: int, benchmarks: list[tuple[str, str
     file_path.write_text(markdown_content)
 
 #Appends information about each benchmark and its results.
-def ap_markdown(dir_path: Path, bench_id: int, benchmark: tuple[str, str, Path], QMAP_RESULTS: float | int,
-                QMAP_INITMAP_RESULTS: float | int, ZAP_RESULTS: float | int):
+def ap_markdown(dir_path: Path, bench_id: int, benchmark: tuple[str, str, Path], results_list: list[tuple[str, int | float]]):
     file_path = dir_path / "BENCHMARK_SPEC.md"
     arch_name, circuit_name, _ = benchmark
 
@@ -87,12 +86,11 @@ def ap_markdown(dir_path: Path, bench_id: int, benchmark: tuple[str, str, Path],
 - Quantum architecture: {arch_name}
 - Benchmark name: {circuit_name}
 
-**Benchmark Results:**
-- QMAP (IPS: Default) Results: {QMAP_RESULTS}
-- QMAP (IPS: ZAP) Results: {QMAP_INITMAP_RESULTS}
-- ZAP Results: {ZAP_RESULTS}
-- QMAP / ZAP: {QMAP_RESULTS / ZAP_RESULTS}
+** Benchmark Results: **
 """
+
+    for ips, result in results_list:
+        markdown_content += f"- QMAP(IPS: {ips}) Results: {result}"
 
     with open(file_path, "a") as f:
         f.write(markdown_content)
@@ -102,6 +100,9 @@ def transpilation(qc: str | QuantumCircuit, output_path: Path, qc_name: str = ""
     custom_gates = [
         qasm2.CustomInstruction("sx", 0, 1, SXGate, builtin=True)
     ]
+
+    if (output_path / f"{qc_name}.qasm").is_file():
+        return
 
     if type(qc) == str:
         circuit = qasm2.load(str(CIRCUIT_INPUT / f"{qc}.qasm"), custom_instructions=custom_gates)

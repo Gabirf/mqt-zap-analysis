@@ -163,6 +163,7 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -
     tran_count = 0
     talk_count = 0
     total_time = 0
+    transfer_time = 0
     active_time = defaultdict(float)
     qubit_loc = {}
     ent_zone = set()
@@ -250,6 +251,7 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -
                         for id in ids:
                             active_time[id] += maxtime
                         total_time += maxtime
+                        transfer_time += maxtime
 
                     else:
                         x, y, id = args
@@ -264,6 +266,7 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -
 
                         active_time[id] += time
                         total_time += time
+                        transfer_time += time
                 case _:
                     pass
 
@@ -278,13 +281,15 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -
         csv_data["1QGC"].append(gate1_count)
         csv_data["2QGC"].append(gate2_count)
         csv_data["transitions"].append(tran_count)
+        csv_data["transfer time"].append(transfer_time)
 
         return fidel
 
 #Batch functions
-def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: str = "N/A"):
+def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list, purpose: str = "N/A"):
 
     #Create Batch directory
+    global save_arch
     BATCH_DIR = WORKSPACE_ROOT / "batches" / f"batch_{batch_id}"
     bench_id = 0
     csv_data: dict[str, list[float | int | str]] = defaultdict(list)
@@ -299,19 +304,22 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
         BENCH_DIR = BATCH_DIR / f"benchmark_{bench_id}"
 
         BENCH_DIR.mkdir(exist_ok=True)
+        for ips in ips_list:
+            ips_name = re.split(r"[.]", f"{ips}")[1]
+            print(f"---running QMAP (IPS: {ips_name}) ---")
+            code, arch = run_qmap(arch_path, circuit_path, ips)
+            save_arch = arch
+            with open(BENCH_DIR / f"QMAP_{ips_name}.naviz", "w") as f:
+                f.write(str(code))
+            utils.sanitize_naviz_file(BENCH_DIR / f"QMAP_{ips_name}.naviz")
 
-        print("---running QMAP (IPS: Default) ---")
-        code, arch = run_qmap(arch_path, circuit_path)
-        arch.to_namachine_file(str(BENCH_DIR / "architecture.namachine"))
-        with open(BENCH_DIR / "QMAP.naviz", "w") as f:
-            f.write(str(code))
-        utils.sanitize_naviz_file(BENCH_DIR / "QMAP.naviz")
+        save_arch.to_namachine_file(str(BENCH_DIR / "architecture.namachine"))
 
-        print("---running QMAP (IPS: ZAP) ---")
-        code, arch = run_qmap(arch_path, circuit_path, InitialPlacementStrategy.ZAP)
+        """print("---running QMAP (IPS: ZAP) ---")
+        code, arch = run_qmap(arch_path, circuit_path, InitialPlacementStrategy.COBRA)
         with open(BENCH_DIR / "QMAP_InitMap.naviz", "w") as f:
             f.write(str(code))
-        utils.sanitize_naviz_file(BENCH_DIR / "QMAP_InitMap.naviz")
+        utils.sanitize_naviz_file(BENCH_DIR / "QMAP_InitMap.naviz")"""
 
         """print("---running ZAP---")
         run_ZAP(arch_path, circuit_path, BENCH_DIR / "ZAP")
@@ -328,17 +336,21 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
         bench = tokens[0]
         qubits = tokens[1].replace("n", "")
 
-        for i in range(2):
+        results = []
+
+        for i, ips in enumerate(ips_list):
+            ips_name = re.split(r"[.]" ,f"{ips}")[1]
+
             csv_data["benchmarks"].append(bench)
             csv_data["qubits"].append(qubits)
+            csv_data["compiler"].append(f"QMAP_{ips_name}")
+            results.append((ips, simulation(arch_path, BENCH_DIR / f"QMAP_{ips_name}.naviz", BENCH_DIR, csv_data)))
 
-        csv_data["compiler"].append("QMAP")
-        QMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP.naviz", BENCH_DIR, csv_data)
-        csv_data["compiler"].append("QMAP ZAPMAP")
-        QMAP_INITMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP_InitMap.naviz", BENCH_DIR, csv_data)
+        #csv_data["compiler"].append("QMAP ZAPMAP")
+        #QMAP_INITMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP_InitMap.naviz", BENCH_DIR, csv_data)
         #csv_data["compiler"].append("ZAP")
         #ZAP_RESULTS = simulation(arch_path, BENCH_DIR / "ZAP.naviz", BENCH_DIR, csv_data)
-        utils.ap_markdown(BATCH_DIR, bench_id, benchmark, QMAP_RESULTS, QMAP_INITMAP_RESULTS , 1)
+        utils.ap_markdown(BATCH_DIR, bench_id, benchmark, results)
 
         df = pd.DataFrame(csv_data)
         df.to_csv(BATCH_DIR / "data.csv", index=False)
@@ -349,16 +361,17 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, purpose: s
 
 def main():
 
-    benchmarks2 = {
+    benchmarks0 = {
         "qft": ("qft", [10, 20, 30, 40, 50]),
-        "graph": ("graphstate", [60, 70, 80, 90, 100]),
+        "graph": ("graphstate", [10, 20, 30, 40, 50, 60, 70]),
     }
 
-    list = [10, 20, 30, 40, 50, 60]
+    list = [10, 20, 30, 40, 50, 60, 100, 200, 400]
     tmp = {"3regular": ("3regular", list)}
     tmp2 = {"graph": ("graphstate", [100, 200, 400, 800])}
+    test = {"graph": ("graphstate", [10, 20, 30, 40, 50])}
 
-    benchmarks = {
+    benchmarks1 = {
         "qaoa": ("qaoa", [10, 20, 30, 40, 50]),
         "qft": ("qft", [10, 20, 30, 40, 50, 60]),
         "arith": ("multiplier", [8, 16, 32]),
@@ -366,14 +379,25 @@ def main():
         "graph": ("graphstate", [60, 70, 80, 90, 100]),
     }
 
+    benchmarks2 = {
+        "qaoa": ("qaoa", [10, 100, 200, 400]),
+        "qft": ("qft", [10, 100, 200, 400, 800]),
+        "arith": ("multiplier", [8, 16, 32, 64, 128, 256]),
+        "ghz": ("ghz", [10, 100, 200, 400, 800, 1600]),
+        "graph": ("graphstate", [10, 100, 200, 400, 800]),
+    }
+
+    ips_list = [InitialPlacementStrategy.Default, InitialPlacementStrategy.VIPER, InitialPlacementStrategy.COBRA]
+
     for i in list:
         qc = utils.generate_3regular_circuit(i)
         circuit_label = f"3regular_n{i}"
         utils.transpilation(qc, CIRCUIT_INPUT / "3regular", circuit_label)
 
-    #utils.batch_transpiler(tmp2)
-    benchmark_list = utils.batch_translator(benchmarks, "square_architecture.json")
-    run_batch(benchmark_list, 14, "Test list reduction (storage zone)")
+    #input("Waiting for debugger: press Enter to proceed...")
+    #utils.batch_transpiler(tmp)
+    benchmark_list = utils.batch_translator(benchmarks0, "square_architecture.json")
+    run_batch(benchmark_list, 33, ips_list ,"Testing COBRA all IPSs")
 
 if __name__ == "__main__":
     main()

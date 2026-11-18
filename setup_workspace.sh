@@ -3,8 +3,8 @@ set -e
 
 echo "=== Initializing Thesis Workspace ==="
 
-if [ -d ".git" ]; then
-    echo "--> Syncing Git submodules (ZAP and QMAP)..."
+if [ -d ".git" ] && [ -z "$(ls -A QMAP 2>/dev/null)" ]; then
+    echo "--> Submodules not found. Initializing Git submodules..."
     git submodule update --init --recursive
 fi
 
