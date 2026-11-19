@@ -178,11 +178,19 @@ def plotter(csv, output_path: Path):
 
     for benchmark, rest in csv.groupby("benchmarks"):
         fig, ax = plt.subplots(figsize=(5.5, 3.5))
+        fig2, ax2 = plt.subplots(figsize=(5.5, 3.5))
 
         for compiler, group in rest.groupby("compiler"):
             ax.plot(
                 group["qubits"],
                 group["fidelity"],
+                marker="o",
+                label=f"{benchmark} ({compiler})",
+            )
+
+            ax2.plot(
+                group["qubits"],
+                group["execution time"],
                 marker="o",
                 label=f"{benchmark} ({compiler})",
             )
@@ -195,10 +203,18 @@ def plotter(csv, output_path: Path):
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend()
 
-        filename = f"plot_{benchmark}.pgf".replace(" ", "_")
+        ax2.set_xlabel(r"Qubits ($x$)")
+        ax2.set_ylabel(r"execution time ($y$)")
+        ax2.grid(True, linestyle="--", alpha=0.5)
+        ax2.legend()
+
+        filename = f"plot_{benchmark}_fidelity.pgf".replace(" ", "_")
+        filename2 = f"plot_{benchmark}_exectime.pgf".replace(" ", "_")
         fig.savefig(output_path / filename, bbox_inches="tight")
+        fig2.savefig(output_path / filename2, bbox_inches="tight")
 
         plt.close(fig)
+        plt.close(fig2)
 
 def generate_3regular_circuit(num_qubits: int, seed: int = 42) -> QuantumCircuit:
     assert num_qubits % 2 == 0, "Number of qubits must be even for a 3-regular graph."

@@ -282,6 +282,7 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -
         csv_data["2QGC"].append(gate2_count)
         csv_data["transitions"].append(tran_count)
         csv_data["transfer time"].append(transfer_time)
+        csv_data["execution time"].append(total_time)
 
         return fidel
 
@@ -343,7 +344,7 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list, 
 
             csv_data["benchmarks"].append(bench)
             csv_data["qubits"].append(qubits)
-            csv_data["compiler"].append(f"QMAP_{ips_name}")
+            csv_data["compiler"].append(f"QMAP {ips_name}")
             results.append((ips, simulation(arch_path, BENCH_DIR / f"QMAP_{ips_name}.naviz", BENCH_DIR, csv_data)))
 
         #csv_data["compiler"].append("QMAP ZAPMAP")
@@ -385,9 +386,10 @@ def main():
         "arith": ("multiplier", [8, 16, 32, 64, 128, 256]),
         "ghz": ("ghz", [10, 100, 200, 400, 800, 1600]),
         "graph": ("graphstate", [10, 100, 200, 400, 800]),
+        "3regular": ("3regular", list)
     }
 
-    ips_list = [InitialPlacementStrategy.Default, InitialPlacementStrategy.VIPER, InitialPlacementStrategy.COBRA]
+    ips_list = [InitialPlacementStrategy.Default ,InitialPlacementStrategy.BasicPair, InitialPlacementStrategy.VIPER, InitialPlacementStrategy.COBRA]
 
     for i in list:
         qc = utils.generate_3regular_circuit(i)
@@ -396,8 +398,8 @@ def main():
 
     #input("Waiting for debugger: press Enter to proceed...")
     #utils.batch_transpiler(tmp)
-    benchmark_list = utils.batch_translator(benchmarks0, "square_architecture.json")
-    run_batch(benchmark_list, 33, ips_list ,"Testing COBRA all IPSs")
+    benchmark_list = utils.batch_translator(benchmarks1, "square_architecture.json")
+    run_batch(benchmark_list, 40, ips_list ,"Testing COBRA all IPSs - Big arch new plots - Big Bench")
 
 if __name__ == "__main__":
     main()
