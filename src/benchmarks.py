@@ -13,6 +13,7 @@ from ZAP.zap.zap import Zap
 from mqt.qmap.na.zoned import ZonedNeutralAtomArchitecture, RoutingAwareCompiler, InitialPlacementStrategy
 from mqt.core import load
 
+
 @dataclass
 class IpsParams:
     strategy: InitialPlacementStrategy = InitialPlacementStrategy.Default
@@ -21,6 +22,7 @@ class IpsParams:
     def __str__(self) -> str:
         return f"{self.strategy.name}{' pruned' if self.prune_center else ''}"
 
+
 # QMAP benchmark
 def run_qmap(arch_path: Path, circuit_path: Path,
              initial_placement: IpsParams) \
@@ -28,14 +30,15 @@ def run_qmap(arch_path: Path, circuit_path: Path,
     arch = ZonedNeutralAtomArchitecture.from_json_file(str(arch_path))
     compiler = RoutingAwareCompiler(
         arch,
-        initial_placement_strategy= initial_placement.strategy,
-        prune_center= initial_placement.prune_center,
+        initial_placement_strategy=initial_placement.strategy,
+        prune_center=initial_placement.prune_center,
         warn_unsupported_gates=True)
 
     circ = load(circuit_path)
     code = compiler.compile(circ)
 
     return code, arch
+
 
 # ZAP benchmark
 def run_ZAP(arch_path: str, circuit_path: Path, output_path: Path) -> None:
@@ -300,13 +303,15 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -
 
 
 # Batch functions
-def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list: list[IpsParams], purpose: str = "N/A"):
+def run_batch(benchmarks_input: dict[str, tuple[str, list[int]]], batch_id: int, ips_list: list[IpsParams],
+              architecture: str = "square_architecture.json", purpose: str = "N/A"):
     # Create Batch directory
     global save_arch
     BATCH_DIR = WORKSPACE_ROOT / "batches" / f"batch_{batch_id}"
     bench_id = 0
     csv_data: dict[str, list[float | int | str]] = defaultdict(list)
 
+    benchmarks: list[tuple[str, str, Path]] = utils.batch_translator(benchmarks_input, architecture)
     utils.init_markdown(BATCH_DIR, batch_id, benchmarks, purpose)
 
     for benchmark in benchmarks:
@@ -319,7 +324,7 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list: 
         BENCH_DIR.mkdir(exist_ok=True)
         for ips in ips_list:
             ips_name = str(ips)
-            #ips_name = re.split(r"[.]", f"{ips}")[1]
+            # ips_name = re.split(r"[.]", f"{ips}")[1]
             print(f"---running QMAP (IPS: {ips_name}) ---")
             code, arch = run_qmap(arch_path, circuit_path, ips)
             save_arch = arch
@@ -354,7 +359,7 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list: 
 
         for i, ips in enumerate(ips_list):
             ips_name = ips
-            #ips_name = re.split(r"[.]", f"{ips}")[1]
+            # ips_name = re.split(r"[.]", f"{ips}")[1]
 
             csv_data["benchmarks"].append(bench)
             csv_data["qubits"].append(qubits)
@@ -405,7 +410,7 @@ def main():
 
     IPS = InitialPlacementStrategy
     ips_list = [
-        IpsParams(), #Default
+        IpsParams(),  # Default
         IpsParams(IPS.BasicPair),
         IpsParams(IPS.VIPER),
         IpsParams(IPS.COBRA),
@@ -426,8 +431,7 @@ def main():
 
     # input("Waiting for debugger: press Enter to proceed...")
     utils.batch_transpiler(benchmarks1)
-    benchmark_list = utils.batch_translator(benchmarks1, "qmap_default.json")
-    run_batch(benchmark_list, 46, ips_list, "Testing cobra with pruning against the rest.")
+    run_batch(benchmarks1, 46, ips_list, "qmap_default.json", purpose="Testing cobra with pruning against the rest.")
 
 
 if __name__ == "__main__":

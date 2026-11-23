@@ -50,14 +50,16 @@ ips_list = [
 ]
 
 # 3. (Optional) Generate and transpile missing circuits into native gates (RY, RZ, CZ)
+# Note: Safe to always run: skips any circuit files that already exist.
 utils.batch_transpiler(benchmarks)
 
 # 4. Execute benchmark batch
 run_batch(
-    benchmarks=benchmarks,
-    batch_id=0,
-    ips_list=ips_list,
-    purpose="First time trying to run this script.",  # optional
+    benchmarks_input= benchmarks,
+    batch_id= 0,
+    ips_list= ips_list,
+    architecture= "qmap_default.json", #optional | default: square_architecture.json
+    purpose= "First time trying to run this script." #optional | default: (N/A)
 )
 ```
 
