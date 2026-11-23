@@ -72,7 +72,7 @@ Benchmarking wrapper comparing zoned neutral-atom quantum compilation in **MQT Q
 ## References
 
 1. Y. Stade, W.-H. Lin, J. Cong, and R. Wille, *"Routing-Aware Placement for Zoned Neutral Atom-based Quantum Computing,"* arXiv:2505.22715, 2025. [[arXiv]](https://arxiv.org/abs/2505.22715)
-2. C. Huang et al., *"ZAP: Zoned Neutral Atom Compiler,"* 2026. [[arXiv]](https://arxiv.org/abs/...)
+2. C. Huang et al., *"ZAP: Zoned Neutral Atom Compiler,"* 2026. [[ieeexplore]](https://ieeexplore.ieee.org/document/11535023)
 
 
 
