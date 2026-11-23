@@ -57,22 +57,30 @@ run_batch(
     benchmarks=benchmarks,
     batch_id=0,
     ips_list=ips_list,
-    purpose="First time trying to run this script.", # optional
+    purpose="First time trying to run this script.",  # optional
 )
 ```
 
 ## License
 
 - **This repository (`src/`, `input/`):** [MIT License](LICENSE)
-- **MQT QMAP (`QMAP/`):** Modified from [cda-tum/mqt-qmap](https://github.com/cda-tum/mqt-qmap) (MIT License)[[1]](#references)
-- **ZAP (`ZAP/`):** Modified from [BAQIS-Quantum/neutral-atom-compilation](https://github.com/BAQIS-Quantum/neutral-atom-compilation) (MIT License)[[2]](#references)
+- **MQT QMAP (`QMAP/`):** Modified from [cda-tum/mqt-qmap](https://github.com/cda-tum/mqt-qmap) (MIT
+  License)[[1]](#references)
+- **ZAP (`ZAP/`):** Modified
+  from [BAQIS-Quantum/neutral-atom-compilation](https://github.com/BAQIS-Quantum/neutral-atom-compilation) (MIT
+  License)[[2]](#references)
 
-Benchmarking wrapper comparing zoned neutral-atom quantum compilation in **MQT QMAP** [[1]](#references) and **ZAP** [[2]](#references).
+Benchmarking wrapper comparing zoned neutral-atom quantum compilation in **MQT QMAP** [[1]](#references) and
+**ZAP** [[2]](#references).
 
 ## References
 
-1. Y. Stade, W.-H. Lin, J. Cong, and R. Wille, *"Routing-Aware Placement for Zoned Neutral Atom-based Quantum Computing,"* arXiv:2505.22715, 2025. [[arXiv]](https://arxiv.org/abs/2505.22715)
-2. C. Huang et al., *"ZAP: Zoned Neutral Atom Compiler,"* 2026. [[ieeexplore]](https://ieeexplore.ieee.org/document/11535023)
+1. Y. Stade, W.-H. Lin, J. Cong, and R. Wille, *"Routing-Aware Placement for Zoned Neutral Atom-based Quantum
+   Computing,"* arXiv:2505.22715, 2025. [[arXiv]](https://arxiv.org/abs/2505.22715)
+2. C. Huang et al., "ZAP: Zoned Architecture and Performant Compiler for Field-Programmable Atom Array," in IEEE
+   Transactions on Quantum Engineering, vol. 7, pp. 3103619-3103619, 2026, Art no. 3103619,
+   doi: 10.1109/TQE.2026.3696707. [[ieeexplore]](https://ieeexplore.ieee.org/document/11535023)
+
 
 
 
