@@ -90,69 +90,10 @@ def ap_markdown(dir_path: Path, bench_id: int, benchmark: tuple[str, str, Path],
 """
 
     for ips, result in results_list:
-        markdown_content += f"- QMAP(IPS: {ips}) Results: {result}"
+        markdown_content += f"- QMAP(IPS: {ips})\n  - Results: {result}\n"
 
     with open(file_path, "a") as f:
         f.write(markdown_content)
-
-#transpilers
-def transpilation(qc: str | QuantumCircuit, output_path: Path, qc_name: str = "") -> None:
-    custom_gates = [
-        qasm2.CustomInstruction("sx", 0, 1, SXGate, builtin=True)
-    ]
-
-    if (output_path / f"{qc_name}.qasm").is_file():
-        return
-
-    if type(qc) == str:
-        circuit = qasm2.load(str(CIRCUIT_INPUT / f"{qc}.qasm"), custom_instructions=custom_gates)
-    else:
-        circuit = qc
-
-    intermediate_circuit = transpile(
-        circuit,
-        basis_gates=["u", "cz"],
-        optimization_level=2
-    )
-
-    # 2. Decompose every 'u' directly into exact Rz - Ry - Rz rotations
-    decomposer = OneQubitEulerDecomposer(basis="ZYZ")
-    transpiled_circuit = QuantumCircuit(*intermediate_circuit.qregs, *intermediate_circuit.cregs)
-
-    for instruction in intermediate_circuit.data:
-        op = instruction.operation
-        qubits = instruction.qubits
-        clbits = instruction.clbits
-
-        if op.name == "u":
-            # Unrolls U(theta, phi, lambda) into explicit Rz and Ry gates
-            decomp_qc = decomposer(op)
-            transpiled_circuit.compose(decomp_qc, qubits=qubits, inplace=True)
-        else:
-            transpiled_circuit.append(op, qubits, clbits)
-
-    transpiled_circuit = transpile(
-        transpiled_circuit,
-        basis_gates=["cz", "rz", "ry"],
-        optimization_level=2
-    )
-    transpiled_circuit.remove_final_measurements(inplace=True)
-    print("Gate counts:", transpiled_circuit.count_ops())
-
-    if type(qc) == str:
-        qc_name = qc
-
-
-    output_path.mkdir(parents=True, exist_ok=True)
-    qasm2.dump(transpiled_circuit, output_path / f"{qc_name}.qasm")
-
-def batch_transpiler(benchmarks: dict[str, tuple[str, list[int]]]) -> None:
-
-    for directory, (circuit, sizes) in benchmarks.items():
-        for size in sizes:
-            qc = get_benchmark(circuit, BenchmarkLevel.INDEP, size)
-            circuit_label = f"{circuit}_n{size}"
-            transpilation(qc, CIRCUIT_INPUT / directory, circuit_label)
 
 def batch_translator(input: dict[str, tuple[str, list[int]]], arch_name: str) -> list[tuple[str, str, Path]]:
 
@@ -215,6 +156,65 @@ def plotter(csv, output_path: Path):
 
         plt.close(fig)
         plt.close(fig2)
+
+#transpilers
+def transpilation(qc: str | QuantumCircuit, output_path: Path, qc_name: str = "") -> None:
+    custom_gates = [
+        qasm2.CustomInstruction("sx", 0, 1, SXGate, builtin=True)
+    ]
+
+    if (output_path / f"{qc_name}.qasm").is_file():
+        return
+
+    if type(qc) == str:
+        circuit = qasm2.load(str(CIRCUIT_INPUT / f"{qc}.qasm"), custom_instructions=custom_gates)
+    else:
+        circuit = qc
+
+    intermediate_circuit = transpile(
+        circuit,
+        basis_gates=["u", "cz"],
+        optimization_level=2
+    )
+
+    # 2. Decompose every 'u' directly into exact Rz - Ry - Rz rotations
+    decomposer = OneQubitEulerDecomposer(basis="ZYZ")
+    transpiled_circuit = QuantumCircuit(*intermediate_circuit.qregs, *intermediate_circuit.cregs)
+
+    for instruction in intermediate_circuit.data:
+        op = instruction.operation
+        qubits = instruction.qubits
+        clbits = instruction.clbits
+
+        if op.name == "u":
+            # Unrolls U(theta, phi, lambda) into explicit Rz and Ry gates
+            decomp_qc = decomposer(op)
+            transpiled_circuit.compose(decomp_qc, qubits=qubits, inplace=True)
+        else:
+            transpiled_circuit.append(op, qubits, clbits)
+
+    transpiled_circuit = transpile(
+        transpiled_circuit,
+        basis_gates=["cz", "rz", "ry"],
+        optimization_level=2
+    )
+    transpiled_circuit.remove_final_measurements(inplace=True)
+    print("Gate counts:", transpiled_circuit.count_ops())
+
+    if type(qc) == str:
+        qc_name = qc
+
+
+    output_path.mkdir(parents=True, exist_ok=True)
+    qasm2.dump(transpiled_circuit, output_path / f"{qc_name}.qasm")
+
+def batch_transpiler(benchmarks: dict[str, tuple[str, list[int]]]) -> None:
+
+    for directory, (circuit, sizes) in benchmarks.items():
+        for size in sizes:
+            qc = get_benchmark(circuit, BenchmarkLevel.INDEP, size)
+            circuit_label = f"{circuit}_n{size}"
+            transpilation(qc, CIRCUIT_INPUT / directory, circuit_label)
 
 def generate_3regular_circuit(num_qubits: int, seed: int = 42) -> QuantumCircuit:
     assert num_qubits % 2 == 0, "Number of qubits must be even for a 3-regular graph."

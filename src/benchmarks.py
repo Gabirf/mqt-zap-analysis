@@ -3,8 +3,9 @@ from collections import defaultdict
 import re
 import math
 import pandas as pd
+from dataclasses import asdict, dataclass
 
-#local files
+# local files
 from config import *
 import utils
 from ZAP.zap.zap import Zap
@@ -12,14 +13,23 @@ from ZAP.zap.zap import Zap
 from mqt.qmap.na.zoned import ZonedNeutralAtomArchitecture, RoutingAwareCompiler, InitialPlacementStrategy
 from mqt.core import load
 
-#QMAP benchmark
+@dataclass
+class IpsParams:
+    strategy: InitialPlacementStrategy = InitialPlacementStrategy.Default
+    prune_center: bool = False
+
+    def __str__(self) -> str:
+        return f"{self.strategy.name}{' pruned' if self.prune_center else ''}"
+
+# QMAP benchmark
 def run_qmap(arch_path: Path, circuit_path: Path,
-             initial_placement: InitialPlacementStrategy = InitialPlacementStrategy.Default) \
-                -> (str, ZonedNeutralAtomArchitecture):
+             initial_placement: IpsParams) \
+        -> (str, ZonedNeutralAtomArchitecture):
     arch = ZonedNeutralAtomArchitecture.from_json_file(str(arch_path))
     compiler = RoutingAwareCompiler(
         arch,
-        initial_placement_strategy=initial_placement,
+        initial_placement_strategy= initial_placement.strategy,
+        prune_center= initial_placement.prune_center,
         warn_unsupported_gates=True)
 
     circ = load(circuit_path)
@@ -29,7 +39,6 @@ def run_qmap(arch_path: Path, circuit_path: Path,
 
 # ZAP benchmark
 def run_ZAP(arch_path: str, circuit_path: Path, output_path: Path) -> None:
-
     with open(str(arch_path), "r") as f:
         architecture = json.load(f)
 
@@ -43,11 +52,11 @@ def run_ZAP(arch_path: str, circuit_path: Path, output_path: Path) -> None:
         routing_strategy="baseline"
     )
 
-    zap.solve(simulation=False,animation=False)
+    zap.solve(simulation=False, animation=False)
 
-#ZAP output translation
+
+# ZAP output translation
 def json_to_naviz_converter(input_path: Path, output_path: Path) -> None:
-
     with open(input_path, "r") as f:
         data = json.load(f)
 
@@ -104,7 +113,8 @@ def json_to_naviz_converter(input_path: Path, output_path: Path) -> None:
     with open(output_path, "w") as f:
         f.writelines(lines)
 
-#Helper functions for simulation
+
+# Helper functions for simulation
 def read_multi_line(data):
     lines = []
     for line in data:
@@ -112,6 +122,7 @@ def read_multi_line(data):
             break
         lines.append(line)
     return lines
+
 
 def zone_check(arch: dict, qubit_id: int, coords: tuple, zone_set: set):
     _, y = coords
@@ -121,6 +132,7 @@ def zone_check(arch: dict, qubit_id: int, coords: tuple, zone_set: set):
         zone_set.add(qubit_id)
     else:
         zone_set.discard(qubit_id)
+
 
 def cz_pairs(ids: set, locs: dict):
     coord_maps = defaultdict(dict)
@@ -154,8 +166,8 @@ def cz_pairs(ids: set, locs: dict):
 
     return pairs, singles
 
-def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -> float | int:
 
+def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -> float | int:
     qubit_count = 0
     gate1_count = 0
     gate2_count = 0
@@ -209,7 +221,7 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -
                         active_time[id1] += t_2
                         active_time[id2] += t_2
                         tmp_gate_count += 1
-                    gate2_count += tmp_gate_count/2
+                    gate2_count += tmp_gate_count / 2
                     total_time += t_2
                 case "load" | "store":
                     if args[0] == "[":
@@ -272,11 +284,11 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -
 
         tmp = 1
         for _, time in active_time.items():
-            tmp *= math.exp(- time / 1500000) # 1.5s straight out of ZAP paper T2
+            tmp *= math.exp(- time / 1500000)  # 1.5s straight out of ZAP paper T2
         print(f"f1: {FIDEL_Q1}, g1c: {gate1_count}, f2: {FIDEL_Q2}, g2c: {gate2_count}, ftr: {FIDEL_TRAN},"
               f" fta: {FIDEL_TALK}, tac: {talk_count} , trc: {tran_count}, tmp: {tmp}")
 
-        fidel = FIDEL_Q1**gate1_count * FIDEL_Q2**gate2_count * FIDEL_TALK**talk_count * FIDEL_TRAN**tran_count * tmp
+        fidel = FIDEL_Q1 ** gate1_count * FIDEL_Q2 ** gate2_count * FIDEL_TALK ** talk_count * FIDEL_TRAN ** tran_count * tmp
         csv_data["fidelity"].append(fidel)
         csv_data["1QGC"].append(gate1_count)
         csv_data["2QGC"].append(gate2_count)
@@ -286,10 +298,10 @@ def simulation(arch_path: Path, input_path: Path, output_path: Path, csv_data) -
 
         return fidel
 
-#Batch functions
-def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list, purpose: str = "N/A"):
 
-    #Create Batch directory
+# Batch functions
+def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list: list[IpsParams], purpose: str = "N/A"):
+    # Create Batch directory
     global save_arch
     BATCH_DIR = WORKSPACE_ROOT / "batches" / f"batch_{batch_id}"
     bench_id = 0
@@ -306,7 +318,8 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list, 
 
         BENCH_DIR.mkdir(exist_ok=True)
         for ips in ips_list:
-            ips_name = re.split(r"[.]", f"{ips}")[1]
+            ips_name = str(ips)
+            #ips_name = re.split(r"[.]", f"{ips}")[1]
             print(f"---running QMAP (IPS: {ips_name}) ---")
             code, arch = run_qmap(arch_path, circuit_path, ips)
             save_arch = arch
@@ -340,17 +353,18 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list, 
         results = []
 
         for i, ips in enumerate(ips_list):
-            ips_name = re.split(r"[.]" ,f"{ips}")[1]
+            ips_name = ips
+            #ips_name = re.split(r"[.]", f"{ips}")[1]
 
             csv_data["benchmarks"].append(bench)
             csv_data["qubits"].append(qubits)
             csv_data["compiler"].append(f"QMAP {ips_name}")
             results.append((ips, simulation(arch_path, BENCH_DIR / f"QMAP_{ips_name}.naviz", BENCH_DIR, csv_data)))
 
-        #csv_data["compiler"].append("QMAP ZAPMAP")
-        #QMAP_INITMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP_InitMap.naviz", BENCH_DIR, csv_data)
-        #csv_data["compiler"].append("ZAP")
-        #ZAP_RESULTS = simulation(arch_path, BENCH_DIR / "ZAP.naviz", BENCH_DIR, csv_data)
+        # csv_data["compiler"].append("QMAP ZAPMAP")
+        # QMAP_INITMAP_RESULTS = simulation(arch_path, BENCH_DIR / "QMAP_InitMap.naviz", BENCH_DIR, csv_data)
+        # csv_data["compiler"].append("ZAP")
+        # ZAP_RESULTS = simulation(arch_path, BENCH_DIR / "ZAP.naviz", BENCH_DIR, csv_data)
         utils.ap_markdown(BATCH_DIR, bench_id, benchmark, results)
 
         df = pd.DataFrame(csv_data)
@@ -360,8 +374,8 @@ def run_batch(benchmarks: list[tuple[str, str, Path]], batch_id: int, ips_list, 
 
         bench_id += 1
 
-def main():
 
+def main():
     benchmarks0 = {
         "qft": ("qft", [10, 20, 30, 40, 50]),
         "graph": ("graphstate", [10, 20, 30, 40, 50, 60, 70]),
@@ -373,11 +387,11 @@ def main():
     test = {"graph": ("graphstate", [10, 20, 30, 40, 50])}
 
     benchmarks1 = {
-        "qaoa": ("qaoa", [10, 20, 30, 40, 50]),
-        "qft": ("qft", [10, 20, 30, 40, 50, 60]),
-        "arith": ("multiplier", [8, 16, 32]),
-        "ghz": ("ghz", [10, 20, 30, 40, 50, 60, 70, 80]),
-        "graph": ("graphstate", [60, 70, 80, 90, 100]),
+        "qaoa": ("qaoa", [10, 20, 30, 40, 5, 60, 70]),
+        "qft": ("qft", [10, 20, 30, 40, 50, 60, 70]),
+        "arith": ("multiplier", [8, 16, 32, 64]),
+        "ghz": ("ghz", [10, 20, 30, 40, 50, 60, 70]),
+        "graph": ("graphstate", [10, 20, 30, 40, 50, 60, 70]),
     }
 
     benchmarks2 = {
@@ -389,17 +403,32 @@ def main():
         "3regular": ("3regular", list)
     }
 
-    ips_list = [InitialPlacementStrategy.Default ,InitialPlacementStrategy.BasicPair, InitialPlacementStrategy.VIPER, InitialPlacementStrategy.COBRA]
+    IPS = InitialPlacementStrategy
+    ips_list = [
+        IpsParams(), #Default
+        IpsParams(IPS.BasicPair),
+        IpsParams(IPS.VIPER),
+        IpsParams(IPS.COBRA),
+        IpsParams(IPS.COBRA, prune_center=True)
+    ]
+
+    ips_cobra = [
+        IpsParams(IPS.COBRA),
+        IpsParams(IPS.COBRA, prune_center=True)
+    ]
+
+    ips_tmp = [IpsParams()]
 
     for i in list:
         qc = utils.generate_3regular_circuit(i)
         circuit_label = f"3regular_n{i}"
         utils.transpilation(qc, CIRCUIT_INPUT / "3regular", circuit_label)
 
-    #input("Waiting for debugger: press Enter to proceed...")
-    #utils.batch_transpiler(tmp)
-    benchmark_list = utils.batch_translator(benchmarks1, "square_architecture.json")
-    run_batch(benchmark_list, 40, ips_list ,"Testing COBRA all IPSs - Big arch new plots - Big Bench")
+    # input("Waiting for debugger: press Enter to proceed...")
+    utils.batch_transpiler(benchmarks1)
+    benchmark_list = utils.batch_translator(benchmarks1, "qmap_default.json")
+    run_batch(benchmark_list, 46, ips_list, "Testing cobra with pruning against the rest.")
+
 
 if __name__ == "__main__":
     main()
