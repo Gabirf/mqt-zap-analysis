@@ -64,8 +64,8 @@ run_batch(
 ## License
 
 - **This repository (`src/`, `input/`):** [MIT License](LICENSE)
-- **MQT QMAP (`QMAP/`):** Modified from [cda-tum/mqt-qmap](https://github.com/cda-tum/mqt-qmap) (MIT License)[cite: 1]
-- **ZAP (`ZAP/`):** Modified from [BAQIS-Quantum/neutral-atom-compilation](https://github.com/BAQIS-Quantum/neutral-atom-compilation) (MIT License)[cite: 1]
+- **MQT QMAP (`QMAP/`):** Modified from [cda-tum/mqt-qmap](https://github.com/cda-tum/mqt-qmap) (MIT License)[[1]](#references)
+- **ZAP (`ZAP/`):** Modified from [BAQIS-Quantum/neutral-atom-compilation](https://github.com/BAQIS-Quantum/neutral-atom-compilation) (MIT License)[[2]](#references)
 
 Benchmarking wrapper comparing zoned neutral-atom quantum compilation in **MQT QMAP** [[1]](#references) and **ZAP** [[2]](#references).
 
