@@ -9,7 +9,8 @@ Benchmarking wrapper and utility scripts aiming at comparing zoned neutral-atom 
 ├── QMAP/               # Forked mqt-qmap submodule (C++/Python core)
 ├── ZAP/                # Forked neutral-atom-compilation submodule
 ├── input/              # Target architectures and benchmark circuit definitions
-├── output/             # Generated batch results, CSV metrics, and .naviz traces
+├── output/             # Generated results, CSV metrics, and .naviz traces for single use
+├── batches/            # Generated batch results, CSV metrics, and .naviz traces
 ├── src/                # Python wrapper, translators, and benchmark runner
 ├── requirements.txt    # Pinned Python dependencies
 ├── setup.sh            # One-time environment and C++ submodule build script
