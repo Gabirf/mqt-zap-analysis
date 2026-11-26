@@ -1,20 +1,23 @@
 from pathlib import Path
-import platform
 import psutil
 from datetime import datetime
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import re
 import networkx as nx
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+import platform
+import shutil
 
 from qiskit import QuantumCircuit, qasm2, transpile
 from qiskit.circuit.library import SXGate
 from qiskit.synthesis import OneQubitEulerDecomposer
 
-from config import QMAP_OUTPUT, CIRCUIT_INPUT
+from config import QMAP_OUTPUT, CIRCUIT_INPUT, WORKSPACE_ROOT
 
-from mqt.qmap.na.zoned import ZonedNeutralAtomArchitecture
+from mqt.qmap.na.zoned import ZonedNeutralAtomArchitecture, InitialPlacementStrategy
 from mqt.bench import get_benchmark, BenchmarkLevel
+
 
 # Replaces u(0,0,y) gates with ry gates
 def sanitize_naviz_file(naviz_path: Path | str) -> None:
@@ -28,6 +31,7 @@ def sanitize_naviz_file(naviz_path: Path | str) -> None:
 
     naviz_path.write_text(updated_content)
 
+
 def qmap_single_output(code: str, arch: ZonedNeutralAtomArchitecture) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M")
     RUN_DIR = QMAP_OUTPUT / f"benchmark_{timestamp}"
@@ -39,6 +43,7 @@ def qmap_single_output(code: str, arch: ZonedNeutralAtomArchitecture) -> None:
         f.write(str(code))
 
     sanitize_naviz_file(RUN_DIR / "run.naviz")
+
 
 # Initialises and writes base information of the batch
 def init_markdown(dir_path: Path, batch_id: int, benchmarks: list[tuple[str, str, Path]], purpose: str):
@@ -75,8 +80,10 @@ def init_markdown(dir_path: Path, batch_id: int, benchmarks: list[tuple[str, str
     # 3. Write the content to the markdown file
     file_path.write_text(markdown_content)
 
-#Appends information about each benchmark and its results.
-def ap_markdown(dir_path: Path, bench_id: int, benchmark: tuple[str, str, Path], results_list: list[tuple[str, int | float]]):
+
+# Appends information about each benchmark and its results.
+def ap_markdown(dir_path: Path, bench_id: int, benchmark: tuple[str, str, Path],
+                results_list: list[tuple[str, int | float]]):
     file_path = dir_path / "BENCHMARK_SPEC.md"
     arch_name, circuit_name, _ = benchmark
 
@@ -95,8 +102,8 @@ def ap_markdown(dir_path: Path, bench_id: int, benchmark: tuple[str, str, Path],
     with open(file_path, "a") as f:
         f.write(markdown_content)
 
-def batch_translator(input: dict[str, tuple[str, list[int]]], arch_name: str) -> list[tuple[str, str, Path]]:
 
+def batch_translator(input: dict[str, tuple[str, list[int]]], arch_name: str) -> list[tuple[str, str, Path]]:
     output: list[tuple[str, str, Path]] = []
     for directory, (circuit, sizes) in input.items():
         for size in sizes:
@@ -104,6 +111,7 @@ def batch_translator(input: dict[str, tuple[str, list[int]]], arch_name: str) ->
             output.append((arch_name, circuit_label, (CIRCUIT_INPUT / directory / circuit_label)))
 
     return output
+
 
 def plotter(csv, output_path: Path):
     # Use the PGF backend
@@ -157,7 +165,104 @@ def plotter(csv, output_path: Path):
         plt.close(fig)
         plt.close(fig2)
 
-#transpilers
+
+def _render_monochrome_dots(image_path: Path, width: int = 34, threshold: int = 95) -> list[str]:
+    dots = [(0, 0, 1), (0, 1, 2), (0, 2, 4), (0, 3, 64), (1, 0, 8), (1, 1, 16), (1, 2, 32), (1, 3, 128)]
+    raw = Image.open(image_path).convert("RGBA")
+    bg = Image.new("RGBA", raw.size, (0, 0, 0, 255))
+    img = Image.alpha_composite(bg, raw).convert("L")
+
+    bbox = img.point(lambda p: 255 if p > 15 else 0).getbbox()
+    if bbox:
+        img = img.crop(bbox)
+
+    img = ImageOps.autocontrast(img, cutoff=2)
+    img = ImageEnhance.Contrast(img).enhance(1.6).filter(ImageFilter.SHARPEN)
+
+    px_w = width * 2
+    px_h = int(width * (img.height / img.width) * 1.8)
+    px_w -= px_w % 2
+    px_h -= px_h % 4
+    img = img.resize((px_w, px_h), Image.Resampling.LANCZOS)
+
+    return [
+        "".join(
+            chr(0x2800 | sum(bit for dx, dy, bit in dots if img.getpixel((x + dx, y + dy)) > threshold))
+            for x in range(0, px_w, 2)
+        )
+        for y in range(0, px_h, 4)
+    ]
+
+def _pad_block_vertical(lines: list[str], target_rows: int, width: int) -> list[str]:
+    if len(lines) >= target_rows:
+        return lines
+    pad_top = (target_rows - len(lines)) // 2
+    pad_bottom = target_rows - len(lines) - pad_top
+    blank = " " * width
+    return [blank] * pad_top + lines + [blank] * pad_bottom
+
+def print_adaptive_header(
+        ips_list: list[InitialPlacementStrategy],
+        fallback_image: Path,
+        art_width: int = 34,
+) -> None:
+    unique_names = list(dict.fromkeys(str(ips) for ips in ips_list))
+
+    info_lines = [
+        "==========================================",
+        " ZONED NEUTRAL ATOM BENCHMARK SUITE",
+        "==========================================",
+        f" Host   : {platform.system()} ({platform.machine()})",
+        f" Python : {platform.python_version()}",
+        " Engine : MQT QMAP / Qiskit",
+        f" Mode   : {'Monochrome TTY'}",
+        "------------------------------------------",
+    ]
+
+    matched_paths: list[Path] = []
+    for name in unique_names:
+        candidate = WORKSPACE_ROOT / f"{name.lower()}_image.png"
+        if candidate.exists():
+            matched_paths.append(candidate)
+
+    # 2. Only use fallback_image if NO special images were found
+    if not matched_paths and fallback_image and fallback_image.exists():
+        matched_paths.append(fallback_image)
+
+    art_blocks = [_render_monochrome_dots(p, width=art_width) for p in matched_paths]
+
+    if not art_blocks:
+        for line in info_lines:
+            print(f"  {line}")
+        return
+
+    max_art_rows = max(len(block) for block in art_blocks)
+    gap = "   "
+    art_total_w = len(art_blocks) * art_width + (len(art_blocks) - 1) * 2
+    info_max_w = max(len(line) for line in info_lines)
+    needed_cols = 2 + art_total_w + len(gap) + info_max_w
+    term_cols = shutil.get_terminal_size((120, 40)).columns
+
+    if needed_cols <= term_cols:
+        total_rows = max(max_art_rows, len(info_lines))
+        padded_blocks = [_pad_block_vertical(b, total_rows, art_width) for b in art_blocks]
+        pad_top = (total_rows - len(info_lines)) // 2
+
+        for row in range(total_rows):
+            left = "  ".join(b[row] for b in padded_blocks)
+            info_idx = row - pad_top
+            right = info_lines[info_idx] if 0 <= info_idx < len(info_lines) else ""
+            print(f"  {left}{gap}{right}")
+    else:
+        padded_blocks = [_pad_block_vertical(b, max_art_rows, art_width) for b in art_blocks]
+        for row in range(max_art_rows):
+            print(f"  {'  '.join(b[row] for b in padded_blocks)}")
+        print()
+        for line in info_lines:
+            print(f"  {line}")
+
+
+# transpilers
 def transpilation(qc: str | QuantumCircuit, output_path: Path, qc_name: str = "") -> None:
     custom_gates = [
         qasm2.CustomInstruction("sx", 0, 1, SXGate, builtin=True)
@@ -204,17 +309,17 @@ def transpilation(qc: str | QuantumCircuit, output_path: Path, qc_name: str = ""
     if type(qc) == str:
         qc_name = qc
 
-
     output_path.mkdir(parents=True, exist_ok=True)
     qasm2.dump(transpiled_circuit, output_path / f"{qc_name}.qasm")
 
-def batch_transpiler(benchmarks: dict[str, tuple[str, list[int]]]) -> None:
 
+def batch_transpiler(benchmarks: dict[str, tuple[str, list[int]]]) -> None:
     for directory, (circuit, sizes) in benchmarks.items():
         for size in sizes:
             qc = get_benchmark(circuit, BenchmarkLevel.INDEP, size)
             circuit_label = f"{circuit}_n{size}"
             transpilation(qc, CIRCUIT_INPUT / directory, circuit_label)
+
 
 def generate_3regular_circuit(num_qubits: int, seed: int = 42) -> QuantumCircuit:
     assert num_qubits % 2 == 0, "Number of qubits must be even for a 3-regular graph."

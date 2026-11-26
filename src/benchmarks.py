@@ -3,8 +3,8 @@ from collections import defaultdict
 import re
 import math
 import pandas as pd
-from dataclasses import asdict, dataclass
-
+from dataclasses import dataclass
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 # local files
 from config import *
 import utils
@@ -22,11 +22,18 @@ class IpsParams:
     def __str__(self) -> str:
         return f"{self.strategy.name}{' pruned' if self.prune_center else ''}"
 
+# Silence IDE non-TTY warnings before importing term_image
+from term_image.image import AutoImage, BlockImage, auto_image_class
+
+import base64
+import io
+import os
+from pathlib import Path
 
 # QMAP benchmark
 def run_qmap(arch_path: Path, circuit_path: Path,
              initial_placement: IpsParams) \
-        -> (str, ZonedNeutralAtomArchitecture):
+        -> tuple[str, ZonedNeutralAtomArchitecture]:
     arch = ZonedNeutralAtomArchitecture.from_json_file(str(arch_path))
     compiler = RoutingAwareCompiler(
         arch,
@@ -41,7 +48,7 @@ def run_qmap(arch_path: Path, circuit_path: Path,
 
 
 # ZAP benchmark
-def run_ZAP(arch_path: str, circuit_path: Path, output_path: Path) -> None:
+def run_zap(arch_path: str, circuit_path: Path, output_path: Path) -> None:
     with open(str(arch_path), "r") as f:
         architecture = json.load(f)
 
@@ -311,6 +318,8 @@ def run_batch(benchmarks_input: dict[str, tuple[str, list[int]]], batch_id: int,
     bench_id = 0
     csv_data: dict[str, list[float | int | str]] = defaultdict(list)
 
+    utils.print_adaptive_header(ips_list, WORKSPACE_ROOT / "asp_image.png")
+
     benchmarks: list[tuple[str, str, Path]] = utils.batch_translator(benchmarks_input, architecture)
     utils.init_markdown(BATCH_DIR, batch_id, benchmarks, purpose)
 
@@ -392,7 +401,7 @@ def main():
     test = {"graph": ("graphstate", [10, 20, 30, 40, 50])}
 
     benchmarks1 = {
-        "qaoa": ("qaoa", [10, 20, 30, 40, 5, 60, 70]),
+        "qaoa": ("qaoa", [10, 20, 30, 40, 50, 60, 70]),
         "qft": ("qft", [10, 20, 30, 40, 50, 60, 70]),
         "arith": ("multiplier", [8, 16, 32, 64]),
         "ghz": ("ghz", [10, 20, 30, 40, 50, 60, 70]),
@@ -408,10 +417,15 @@ def main():
         "3regular": ("3regular", list)
     }
 
+    benchmarks_regular = {
+        "3regular": ("3regular", list)
+    }
+
     IPS = InitialPlacementStrategy
     ips_list = [
         IpsParams(),  # Default
-        IpsParams(IPS.BasicPair),
+        IpsParams(IPS.ZAP),
+        IpsParams(IPS.ASP),
         IpsParams(IPS.VIPER),
         IpsParams(IPS.COBRA),
         IpsParams(IPS.COBRA, prune_center=True)
@@ -422,7 +436,7 @@ def main():
         IpsParams(IPS.COBRA, prune_center=True)
     ]
 
-    ips_tmp = [IpsParams()]
+    ips_tmp = [IpsParams(IPS.ASP)]
 
     for i in list:
         qc = utils.generate_3regular_circuit(i)
@@ -430,8 +444,14 @@ def main():
         utils.transpilation(qc, CIRCUIT_INPUT / "3regular", circuit_label)
 
     # input("Waiting for debugger: press Enter to proceed...")
-    utils.batch_transpiler(benchmarks1)
-    run_batch(benchmarks1, 46, ips_list, "qmap_default.json", purpose="Testing cobra with pruning against the rest.")
+    #utils.batch_transpiler(benchmarks2)
+    run_batch(
+        benchmarks_regular,
+        53,
+        ips_list= ips_list,
+        architecture= "square_architecture.json",
+        purpose= "test"
+    )
 
 
 if __name__ == "__main__":
